@@ -1,0 +1,686 @@
+{% extends "base.html" %}
+
+{% block title %}Files - Localy{% endblock %}
+
+{% block content %}
+<!-- Storage Stats -->
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="stats-card">
+      <h4 class="mb-2"><i class="bi bi-hdd-stack me-2"></i>Storage Information</h4>
+      <div class="row">
+        <div class="col-sm-3">
+          <small class="d-block">Total Files</small>
+          <strong id="total-files">-</strong>
+        </div>
+        <div class="col-sm-3">
+          <small class="d-block">Used Space</small>
+          <strong id="used-space">-</strong>
+        </div>
+        <div class="col-sm-3">
+          <small class="d-block">Free Space</small>
+          <strong id="free-space">-</strong>
+        </div>
+        <div class="col-sm-3 text-center text-sm-start">
+          <small class="d-block">Disk Usage <span id="disk-percent">-</span></small>
+          <div class="progress mt-1" style="height: 10px; width: 100%; max-width: 220px;">
+            <div class="progress-bar" role="progressbar" id="storage-progress" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Upload Area -->
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="upload-area" id="upload-area">
+      <i class="bi bi-cloud-upload file-icon text-primary"></i>
+      <h5 class="mb-3">Drag & Drop Files Here</h5>
+      <p class="text-muted mb-3">or click to browse files</p>
+      <form id="upload-form" method="POST" action="{{ url_for('upload_file') }}" enctype="multipart/form-data">
+        <input type="file" id="file-input" name="files" multiple style="display: none;">
+        <button type="button" class="btn btn-primary-custom btn-custom" id="choose-files-btn">
+          <i class="bi bi-plus-circle me-2"></i>Choose Files
+        </button>
+      </form>
+
+      <!-- Selected Files Display -->
+      <div id="selected-files-container" style="display: none;" class="mt-3">
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h6 class="mb-0"><i class="bi bi-files me-2"></i>Selected Files (<span id="selected-count">0</span>)</h6>
+            <div>
+              <div class="d-flex flex-column flex-sm-row gap-2">
+                <button type="button" class="btn btn-sm btn-outline-danger" id="clear-all-btn">
+                  <i class="bi bi-trash me-1"></i>Clear All
+                </button>
+                <button type="button" class="btn btn-sm btn-primary-custom btn-custom" id="confirm-upload-btn">
+                  <i class="bi bi-upload me-1"></i>Upload Files
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div id="selected-files-list" class="row"></div>
+          </div>
+        </div>
+      </div>
+
+      <small class="text-muted d-block mt-2">Maximum file size: {{ max_size_gb }} GB</small>
+    </div>
+  </div>
+</div>
+
+<!-- Category Filter -->
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div class="d-flex flex-wrap gap-2">
+        <a href="{{ url_for('files') }}"
+          class="btn btn-sm {{ 'btn-primary-custom' if not current_category else 'btn-outline-secondary' }} btn-custom">
+          <i class="bi bi-grid-3x3-gap me-1"></i>All Files
+        </a>
+        {% for category in categories %}
+        <a href="{{ url_for('files', category=category) }}"
+          class="btn btn-sm {{ 'btn-primary-custom' if current_category == category else 'btn-outline-secondary' }} btn-custom">
+          <i
+            class="bi bi-{{ 'image' if category == 'images' else 'play-circle' if category == 'videos' else 'music-note' if category == 'audio' else 'file-text' if category == 'documents' else 'archive' if category == 'archives' else 'file-earmark' }} me-1"></i>
+          {{ category.title() }}
+        </a>
+        {% endfor %}
+      </div>
+
+      <!-- Global File Selection Controls -->
+      <div id="global-selection-controls" style="display: none;" class="d-flex gap-2">
+        <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllFiles()">
+          <i class="bi bi-check-all me-1"></i>Select All
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="deselectAllFiles()">
+          <i class="bi bi-x-square me-1"></i>Deselect All
+        </button>
+        <button type="button" class="btn btn-sm btn-danger" onclick="deleteSelectedFiles()">
+          <i class="bi bi-trash me-1"></i>Delete Selected (<span id="selected-delete-count">0</span>)
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Files Display -->
+{% if files_by_category %}
+{% for category, files in files_by_category.items() %}
+<div class="row mb-4">
+  <div class="col-12">
+    <h5 class="mb-3">
+      <span class="category-pill category-{{ category }}">{{ category.title() }}</span>
+      <small class="text-muted ms-2">({{ files|length }} files)</small>
+    </h5>
+
+    <div class="row">
+      {% for file in files %}
+      <div class="col-xl-3 col-lg-4 col-md-6 col-sm-12 mb-3">
+        <div class="file-card">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <div class="d-flex align-items-center">
+              <input type="checkbox" class="form-check-input me-2 file-checkbox" data-category="{{ file.category }}"
+                data-filename="{{ file.name }}" onchange="updateDeleteSelection()">
+              <div class="file-type-icon">
+                {% if file.category == 'images' %}
+                <i class="bi bi-image text-warning file-icon"></i>
+                {% elif file.category == 'videos' %}
+                <i class="bi bi-play-circle text-primary file-icon"></i>
+                {% elif file.category == 'audio' %}
+                <i class="bi bi-music-note text-danger file-icon"></i>
+                {% elif file.category == 'documents' %}
+                <i class="bi bi-file-text text-success file-icon"></i>
+                {% elif file.category == 'archives' %}
+                <i class="bi bi-archive text-info file-icon"></i>
+                {% else %}
+                <i class="bi bi-file-earmark text-secondary file-icon"></i>
+                {% endif %}
+              </div>
+            </div>
+            <div class="dropdown">
+              <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                <i class="bi bi-three-dots"></i>
+              </button>
+              <ul class="dropdown-menu">
+                <li>
+                  <a class="dropdown-item"
+                    href="{{ url_for('download_file', category=file.category, filename=file.name) }}">
+                    <i class="bi bi-download me-2"></i>Download
+                  </a>
+                </li>
+                {% if file.is_previewable %}
+                <li>
+                  <a class="dropdown-item" href="#" onclick="previewFile('{{ file.category }}', '{{ file.name }}')">
+                    <i class="bi bi-eye me-2"></i>Preview
+                  </a>
+                </li>
+                {% endif %}
+                <li>
+                  <hr class="dropdown-divider">
+                </li>
+                <li>
+                  <a class="dropdown-item text-danger" href="#"
+                    onclick="deleteFile('{{ file.category }}', '{{ file.name }}')">
+                    <i class="bi bi-trash me-2"></i>Delete
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <h6 class="file-name mb-2 text-truncate" title="{{ file.name }}" style="max-width: 100%;">
+            {{ file.name }}
+          </h6>
+
+          <div class="file-meta">
+            <small class="text-muted d-block"><i class="bi bi-hdd me-1"></i>{{ file.size_readable }}</small>
+            <small class="text-muted d-block"><i class="bi bi-calendar me-1"></i>{{ file.modified }}</small>
+            <small class="text-muted d-block"><i class="bi bi-device-ssd me-1"></i>{{ file.device }}</small>
+          </div>
+
+          <div class="mt-2">
+            <button class="btn btn-sm btn-outline-primary px-2 py-1" style="border-radius: 0.5rem;"
+              onclick="downloadFile('{{ file.category }}', '{{ file.name }}')">
+              <i class="bi bi-download"></i>
+            </button>
+            {% if file.is_previewable %}
+            <button class="btn btn-sm btn-outline-success px-2 py-1 ms-1" style="border-radius: 0.5rem;"
+              onclick="previewFile('{{ file.category }}', '{{ file.name }}')">
+              <i class="bi bi-eye"></i>
+            </button>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="row">
+  <div class="col-12 text-center py-5">
+    <i class="bi bi-folder2-open text-muted" style="font-size: 4rem;"></i>
+    <h4 class="mt-3 text-muted">No files uploaded yet</h4>
+    <p class="text-muted">Upload some files to get started!</p>
+  </div>
+</div>
+{% endif %}
+
+<!-- Bootstrap Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content bg-dark text-light">
+      <div class="modal-header">
+        <h5 class="modal-title" id="previewModalLabel">File Preview</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="previewContent" style="background-color: #212529;">
+        <!-- Content will be injected by JavaScript -->
+      </div>
+      <div class="modal-footer">
+        <a id="downloadBtn" href="#" class="btn btn-primary" download>Download</a>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bootstrap Delete Confirmation Modal -->
+<div class="modal fade" id="deleteConfirmationModal" tabindex="-1" aria-labelledby="deleteModalLabel"
+  aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content bg-dark text-light">
+      <div class="modal-header">
+        <h5 class="modal-title" id="deleteModalLabel">Confirm Deletion</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="deleteConfirmationBody">
+        Are you sure you want to delete the selected file(s)?
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // --- Custom Modal Logic ---
+  function openModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden'; // Prevent background scrolling
+
+    // Special handling for image preview to ensure it fits without scrolling
+    if (modalId === 'previewModal') {
+      // The content div ID is customPreviewContent, not previewContent
+      const image = modal.querySelector('#customPreviewContent img');
+      if (image) {
+        const resizeImage = () => {
+          const viewHeight = window.innerHeight;
+          // Set max-height based on viewport, leaving some padding
+          image.style.maxHeight = `${viewHeight * 0.85}px`;
+        };
+
+        // Handle both cases: image loading now, or image already cached
+        if (image.complete) {
+          resizeImage();
+        } else {
+          image.onload = resizeImage;
+        }
+      }
+    }
+  }
+
+  function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.classList.remove('show');
+    }
+    // Only restore body scroll if no other modals are open
+    if (document.querySelectorAll('.custom-modal.show').length === 0) {
+      document.body.style.overflow = 'auto';
+    }
+  }
+
+  // Close modal if user clicks outside of the content or presses Escape key
+  window.addEventListener('click', function (event) {
+    if (event.target.classList.contains('custom-modal')) {
+      closeModal(event.target.id);
+    }
+  });
+  window.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') {
+      document.querySelectorAll('.custom-modal.show').forEach(modal => {
+        closeModal(modal.id);
+      });
+    }
+  });
+
+  // Load storage information
+  function loadStorageInfo() {
+    fetch('/api/storage-info')
+      .then(response => response.json())
+      .then(data => {
+        if (!data) return;
+        document.getElementById('total-files').textContent = data.total_files;
+        document.getElementById('used-space').textContent = data.total_size_readable;
+        document.getElementById('free-space').textContent = data.disk_free_readable;
+
+        const usagePercent = (data.disk_used / data.disk_total) * 100;
+        const progressBar = document.getElementById('storage-progress');
+        if (progressBar) {
+          progressBar.style.width = usagePercent + '%';
+          progressBar.setAttribute('aria-valuenow', usagePercent.toFixed(2));
+
+          // Update progress bar color based on usage percentage
+          progressBar.classList.remove('bg-success', 'bg-warning', 'bg-danger', 'bg-info', 'bg-light');
+          if (usagePercent < 60) {
+            progressBar.classList.add('bg-success');
+          } else if (usagePercent < 80) {
+            progressBar.classList.add('bg-warning');
+          } else {
+            progressBar.classList.add('bg-danger');
+          }
+        }
+        document.getElementById('disk-percent').textContent = usagePercent.toFixed(2) + '%';
+      })
+      .catch(error => console.error('Error loading storage info:', error));
+  }
+
+  // File selection and upload functionality
+  const uploadArea = document.getElementById('upload-area');
+  const fileInput = document.getElementById('file-input');
+  const uploadForm = document.getElementById('upload-form');
+  const chooseFilesBtn = document.getElementById('choose-files-btn');
+  const selectedFilesContainer = document.getElementById('selected-files-container');
+  const selectedFilesList = document.getElementById('selected-files-list');
+  const selectedCount = document.getElementById('selected-count');
+  const clearAllBtn = document.getElementById('clear-all-btn');
+  const confirmUploadBtn = document.getElementById('confirm-upload-btn');
+
+  let selectedFiles = [];
+
+  if (chooseFilesBtn) {
+    chooseFilesBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      fileInput.click();
+    });
+  }
+
+  if (uploadArea) {
+    uploadArea.addEventListener('click', (e) => {
+      if (e.target !== chooseFilesBtn && !chooseFilesBtn.contains(e.target) &&
+        !selectedFilesContainer.contains(e.target) && !e.target.closest('#selected-files-container')) {
+        fileInput.click();
+      }
+    });
+
+    uploadArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadArea.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      uploadArea.classList.remove('dragover');
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      uploadArea.classList.remove('dragover');
+
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length > 0) {
+        addFilesToSelection(files);
+      }
+    });
+  }
+
+  if (fileInput) {
+    fileInput.addEventListener('change', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (fileInput.files.length > 0) {
+        const files = Array.from(fileInput.files);
+        addFilesToSelection(files);
+      }
+      fileInput.value = '';
+    });
+  }
+
+  if (clearAllBtn) {
+    clearAllBtn.addEventListener('click', () => {
+      selectedFiles = [];
+      updateSelectedFilesDisplay();
+    });
+  }
+
+  if (confirmUploadBtn) {
+    confirmUploadBtn.addEventListener('click', () => {
+      if (selectedFiles.length > 0) {
+        handleFileUpload(selectedFiles);
+      }
+    });
+  }
+
+  function addFilesToSelection(files) {
+    files.forEach(file => {
+      const exists = selectedFiles.some(f => f.name === file.name && f.size === file.size);
+      if (!exists) {
+        selectedFiles.push(file);
+      }
+    });
+    updateSelectedFilesDisplay();
+  }
+
+  function removeFileFromSelection(index) {
+    selectedFiles.splice(index, 1);
+    updateSelectedFilesDisplay();
+  }
+
+  function updateSelectedFilesDisplay() {
+    if (!selectedCount || !selectedFilesContainer || !selectedFilesList) return;
+    selectedCount.textContent = selectedFiles.length;
+
+    if (selectedFiles.length === 0) {
+      selectedFilesContainer.style.display = 'none';
+      return;
+    }
+
+    selectedFilesContainer.style.display = 'block';
+    selectedFilesList.innerHTML = '';
+
+    selectedFiles.forEach((file, index) => {
+      const fileElement = document.createElement('div');
+      fileElement.className = 'col-md-6 col-lg-4 mb-2';
+
+      const fileSize = formatFileSize(file.size);
+      const fileIcon = getFileIcon(file.name);
+
+      fileElement.innerHTML = `
+            <div class="card selected-file-card">
+                <div class="card-body p-2 shadow-sm" style="transition: box-shadow 0.2s;">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1 me-2" style="min-width: 0;">
+                            <div class="d-flex align-items-center mb-1">
+                                <i class="bi bi-${fileIcon} me-2 text-primary flex-shrink-0"></i>
+                                <small class="fw-bold text-truncate" title="${file.name}">${file.name}</small>
+                            </div>
+                            <small class="text-muted">${fileSize}</small>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFileFromSelection(${index})" title="Remove file">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+      selectedFilesList.appendChild(fileElement);
+    });
+  }
+
+  function getFileIcon(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'].includes(ext)) return 'image';
+    if (['mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm'].includes(ext)) return 'play-circle';
+    if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a'].includes(ext)) return 'music-note';
+    if (['pdf', 'doc', 'docx', 'txt', 'rtf'].includes(ext)) return 'file-text';
+    if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return 'archive';
+    return 'file-earmark';
+  }
+
+  function formatFileSize(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  }
+
+  function handleFileUpload(files) {
+    if (files.length === 0 || !uploadArea) return;
+
+    const fileCount = files.length;
+    const fileText = fileCount === 1 ? 'file' : 'files';
+    uploadArea.innerHTML = `
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Uploading...</span>
+        </div>
+        <h5 class="mt-3">Uploading ${fileCount} ${fileText}...</h5>
+        <p class="text-muted">Please wait...</p>
+    `;
+    uploadFiles(files, 0);
+  }
+
+  function uploadFiles(files, index) {
+    if (index >= files.length) {
+      selectedFiles = [];
+      updateSelectedFilesDisplay();
+      sessionStorage.setItem('scrollPosition', window.scrollY);
+      location.reload();
+      return;
+    }
+
+    const file = files[index];
+    const formData = new FormData();
+    formData.append('file', file);
+
+    fetch(uploadForm.action, {
+      method: 'POST',
+      body: formData
+    }).then(response => {
+      if (response.ok) {
+        uploadFiles(files, index + 1);
+      } else {
+        throw new Error(`Upload failed for ${file.name}`);
+      }
+    }).catch(error => {
+      console.error('Upload error:', error);
+      alert(`Upload failed for ${file.name}: ${error.message}`);
+      uploadFiles(files, index + 1);
+    });
+  }
+
+  function downloadFile(category, filename) {
+    window.location.href = `/download/${category}/${filename}`;
+  }
+
+  function previewFile(category, filename) {
+    const title = document.getElementById('previewModalLabel');
+    const content = document.getElementById('previewContent');
+    const downloadBtn = document.getElementById('downloadBtn');
+
+    title.textContent = filename;
+    downloadBtn.href = `/download/${category}/${filename}`;
+
+    const extension = filename.split('.').pop().toLowerCase();
+    const previewUrl = `/preview/${category}/${filename}`;
+
+    content.innerHTML = '<div class="d-flex justify-content-center align-items-center" style="height: 100%;"><div class="spinner-border text-light" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(extension)) {
+      content.innerHTML = `<img src="${previewUrl}" class="img-fluid mx-auto d-block" style="max-height: 75vh; object-fit: contain;">`;
+    } else if (['mp4', 'webm', 'ogv'].includes(extension)) {
+      content.innerHTML = `<video src="${previewUrl}" controls class="w-100" style="max-height: 75vh;"></video>`;
+    } else if (extension === 'pdf') {
+      content.innerHTML = `<iframe src="${previewUrl}" style="width: 100%; height: 75vh;" frameborder="0"></iframe>`;
+    } else if (['txt', 'log', 'py', 'js', 'html', 'css', 'json', 'md'].includes(extension)) {
+      fetch(previewUrl)
+        .then(response => response.text())
+        .then(text => {
+          content.innerHTML = `<pre class="bg-dark text-light p-3" style="max-height: 70vh; overflow-y: auto;"><code>${text.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></pre>`;
+        });
+    } else {
+      content.innerHTML = `<div class="text-center p-5"><i class="bi bi-file-earmark-binary" style="font-size: 5rem;"></i><p class="mt-3">No preview available for this file type.</p></div>`;
+    }
+
+    const previewModal = new bootstrap.Modal(document.getElementById('previewModal'));
+    previewModal.show();
+  }
+
+  // --- Deletion Logic Using Bootstrap Modal ---
+  let pendingDeleteFiles = [];
+
+  const deleteConfirmationModalEl = document.getElementById('deleteConfirmationModal');
+  const deleteConfirmationModal = new bootstrap.Modal(deleteConfirmationModalEl);
+  const deleteConfirmationBody = document.getElementById('deleteConfirmationBody');
+  const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+
+  function deleteFile(category, filename) {
+    pendingDeleteFiles = [{ category, filename }];
+    if (deleteConfirmationBody) {
+      deleteConfirmationBody.textContent = `Are you sure you want to delete \"${filename}\"?`;
+    }
+    deleteConfirmationModal.show();
+  }
+
+  // Bulk delete functionality
+  let selectedFilesForDeletion = [];
+
+  function updateDeleteSelection() {
+    const checkboxes = document.querySelectorAll('.file-checkbox:checked');
+    selectedFilesForDeletion = Array.from(checkboxes).map(checkbox => ({
+      category: checkbox.dataset.category,
+      filename: checkbox.dataset.filename
+    }));
+
+    const counter = document.getElementById('selected-delete-count');
+    if (counter) counter.textContent = selectedFilesForDeletion.length;
+
+    const globalControls = document.getElementById('global-selection-controls');
+    if (globalControls) {
+      globalControls.style.display = selectedFilesForDeletion.length > 0 ? 'flex' : 'none';
+    }
+  }
+
+  function deleteSelectedFiles() {
+    if (selectedFilesForDeletion.length === 0) return;
+
+    pendingDeleteFiles = [...selectedFilesForDeletion];
+    if (deleteConfirmationBody) {
+      deleteConfirmationBody.textContent = `Are you sure you want to delete ${pendingDeleteFiles.length} selected file(s)?`;
+    }
+    deleteConfirmationModal.show();
+  }
+
+  function performDeletion(index = 0) {
+    if (index >= pendingDeleteFiles.length) {
+      // All done, refresh list
+      sessionStorage.setItem('scrollPosition', window.scrollY);
+      location.reload();
+      return;
+    }
+
+    const file = pendingDeleteFiles[index];
+    fetch(`/delete/${file.category}/${file.filename}`, {
+      method: 'POST'
+    }).then(() => {
+      performDeletion(index + 1);
+    }).catch(err => {
+      console.error('Deletion failed:', err);
+      performDeletion(index + 1);
+    });
+  }
+
+  if (confirmDeleteBtn) {
+    confirmDeleteBtn.addEventListener('click', () => {
+      deleteConfirmationModal.hide();
+      performDeletion();
+    });
+  }
+
+  // Attach updateDeleteSelection to all checkboxes
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.file-checkbox').forEach(cb => {
+      cb.addEventListener('change', updateDeleteSelection);
+    });
+  });
+
+  // Load storage info on page load
+  document.addEventListener('DOMContentLoaded', loadStorageInfo);
+  setInterval(loadStorageInfo, 60000);
+
+  // Keep existing helper functions visible globally
+  window.deleteFile = deleteFile;
+  window.deleteSelectedFiles = deleteSelectedFiles;
+
+  // Selection helper functions
+  function selectAllFiles() {
+    document.querySelectorAll('.file-checkbox').forEach(cb => cb.checked = true);
+    updateDeleteSelection();
+  }
+
+  function deselectAllFiles() {
+    document.querySelectorAll('.file-checkbox').forEach(cb => cb.checked = false);
+    updateDeleteSelection();
+  }
+
+  window.selectAllFiles = selectAllFiles;
+  window.deselectAllFiles = deselectAllFiles;
+
+  // Attach modals directly to <body> to avoid scroll containment issues
+  document.addEventListener('DOMContentLoaded', () => {
+    ['previewModal', 'deleteConfirmationModal'].forEach(id => {
+      const modalEl = document.getElementById(id);
+      if (modalEl && modalEl.parentNode !== document.body) {
+        document.body.appendChild(modalEl);
+      }
+    });
+  });
+</script>
+{% endblock %}

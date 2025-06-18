@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Localy{% endblock %}</title>
+
+  <!-- Bootstrap CSS (Local) -->
+  <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+  <!-- Bootstrap Icons (Local) -->
+  <link href="{{ url_for('static', filename='css/bootstrap-icons.css') }}" rel="stylesheet">
+
+  <style>
+    :root {
+      --primary-color: #4f46e5;
+      --primary-hover: #4338ca;
+      --success-color: #10b981;
+      --danger-color: #ef4444;
+      --warning-color: #f59e0b;
+      --dark-bg: #1f2937;
+      --light-bg: #f8fafc;
+    }
+
+    body {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .main-container {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+      margin: 20px auto;
+      max-width: 1400px;
+      overflow: hidden;
+    }
+
+    .navbar-custom {
+      background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+      border: none;
+      padding: 1rem 0;
+    }
+
+    .navbar-brand {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: white !important;
+    }
+
+    .upload-area {
+      border: 3px dashed #cbd5e1;
+      border-radius: 15px;
+      padding: 2rem;
+      text-align: center;
+      background: #f8fafc;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+
+    .upload-area:hover {
+      border-color: var(--primary-color);
+      background: #f1f5f9;
+    }
+
+    .upload-area.dragover {
+      border-color: var(--success-color);
+      background: #f0fdf4;
+    }
+
+    .file-card {
+      background: white;
+      border-radius: 15px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+      border: 1px solid #e2e8f0;
+      transition: all 0.3s ease;
+    }
+
+    .file-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    }
+
+    .selected-file-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .selected-file-card:hover {
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .file-checkbox {
+      width: 18px !important;
+      height: 18px !important;
+      cursor: pointer;
+    }
+
+    /* --- Custom Modal --- */
+    .custom-modal {
+      display: none;
+      /* Hidden by default */
+      position: fixed;
+      /* Stay in place (relative to the viewport) */
+      z-index: 1050;
+      /* Sit on top */
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      /* Black w/ opacity - THIS IS THE BACKDROP */
+      overflow: hidden;
+      /* Prevent body scroll when modal is open */
+    }
+
+    .custom-modal.show {
+      display: block;
+    }
+
+    .custom-modal-content {
+      background-color: #fefefe;
+      padding: 20px;
+      border: 1px solid #888;
+      border-radius: 15px;
+      width: auto;
+      max-width: 90vw;
+      max-height: 90vh;
+      /* Set a max-height for the container */
+      position: fixed;
+      /* Position relative to the viewport */
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      /* The key to perfect centering */
+      box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .custom-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .custom-modal-header h5 {
+      margin: 0;
+    }
+
+    .custom-close-btn {
+      color: #aaa;
+      font-size: 28px;
+      font-weight: bold;
+      background: none;
+      border: none;
+      cursor: pointer;
+    }
+
+    .custom-close-btn:hover,
+    .custom-close-btn:focus {
+      color: black;
+      text-decoration: none;
+    }
+
+    .custom-modal-body {
+      padding: 15px 0;
+      overflow-y: auto;
+      /* Scroll only inside the body if text is long */
+    }
+
+    .custom-modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #eee;
+    }
+
+    #customPreviewContent img,
+    #customPreviewContent video,
+    #customPreviewContent iframe {
+      max-width: 100%;
+      /* Never wider than its container */
+      height: auto;
+      /* Maintain aspect ratio */
+      display: block;
+      margin: 0 auto;
+    }
+
+    .custom-modal-body ul {
+      max-height: 40vh;
+      overflow-y: auto;
+    }
+
+    @media (max-width: 768px) {
+      .custom-modal-content {
+        width: 95%;
+      }
+    }
+
+    .category-pill {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 50px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .category-images {
+      background: #fef3c7;
+      color: #d97706;
+    }
+
+    .category-videos {
+      background: #ddd6fe;
+      color: #7c3aed;
+    }
+
+    .category-audio {
+      background: #fed7d7;
+      color: #e53e3e;
+    }
+
+    .category-documents {
+      background: #d1fae5;
+      color: #059669;
+    }
+
+    .category-archives {
+      background: #e0e7ff;
+      color: #3730a3;
+    }
+
+    .category-others {
+      background: #f3f4f6;
+      color: #374151;
+    }
+
+    /* --- Custom Button Styles --- */
+    .btn-custom {
+      border-radius: 50px;
+      padding: 10px 20px;
+      font-weight: bold;
+      transition: all 0.3s ease;
+      border: none;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      font-size: 0.9rem;
+    }
+
+    .btn-primary-custom {
+      background: linear-gradient(45deg, #0d6efd, #0d6efd);
+      color: white;
+    }
+
+    .btn-primary-custom:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(13, 110, 253, 0.4);
+    }
+
+    .btn-danger-custom {
+      background: linear-gradient(45deg, #dc3545, #dc3545);
+      color: white;
+    }
+
+    .btn-danger-custom:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(220, 53, 69, 0.4);
+    }
+
+    .file-card a,
+    .file-card a:hover {
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .file-icon {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .stats-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-radius: 15px;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .alert-custom {
+      border: none;
+      border-radius: 10px;
+      font-weight: 500;
+    }
+
+    .modal-content {
+      border-radius: 15px;
+      border: none;
+    }
+
+    .modal-header {
+      border-bottom: 1px solid #e2e8f0;
+      border-radius: 15px 15px 0 0;
+    }
+
+    @media (max-width: 768px) {
+      .main-container {
+        margin: 10px;
+        border-radius: 15px;
+      }
+
+      .file-card {
+        padding: 0.75rem;
+      }
+    }
+
+    /* Force proper stacking order for Bootstrap modals */
+    .modal-backdrop {
+      z-index: 2049 !important;
+      pointer-events: none !important;
+    }
+
+    .modal {
+      z-index: 2050 !important;
+    }
+
+    @media (max-width: 576px) {
+
+      /* disk progress full width */
+      .stats-card .progress {
+        max-width: 100% !important;
+      }
+
+      /* Tighter buttons on mobile */
+      .btn-custom {
+        padding: 6px 12px;
+        font-size: 0.8rem;
+      }
+
+      .btn-sm {
+        padding: 0.25rem 0.6rem;
+        font-size: 0.8rem;
+      }
+
+      /* Upload area adjustments */
+      .upload-area {
+        padding: 1rem;
+      }
+
+      .upload-area h5 {
+        font-size: 1.1rem;
+      }
+
+      .upload-area p {
+        font-size: 0.85rem;
+      }
+
+      /* Selected files card header: stack buttons */
+      #selected-files-container .card-header {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 0.5rem;
+      }
+
+      #selected-files-container .card-header h6 {
+        margin-bottom: 0.5rem;
+      }
+
+      #selected-files-container .card-header .btn {
+        width: 100%;
+      }
+
+      /* Global selection controls */
+      #global-selection-controls {
+        flex-direction: column;
+        width: 100%;
+        gap: 0.5rem;
+      }
+
+      #global-selection-controls .btn {
+        width: 100%;
+      }
+
+      /* File card adjustments */
+      .file-card {
+        padding: 1rem;
+      }
+
+      .file-icon {
+        font-size: 1.5rem;
+      }
+    }
+
+    /* Uniform button styling */
+    .btn {
+      border-radius: 0.4rem !important;
+      font-weight: 500;
+    }
+
+    .btn-sm {
+      padding: 0.35rem 0.8rem;
+      font-size: 0.9rem;
+    }
+
+    .modal-open .main-container {
+      overflow: visible !important;
+    }
+
+    .modal-body {
+      white-space: normal !important;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+  </style>
+
+  {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="position-fixed top-0 end-0 p-3" style="z-index: 2000; pointer-events: none; width: max-content;">
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }} alert-dismissible fade show mb-2" role="alert" data-bs-theme="dark"
+      style="pointer-events: auto; min-width: 300px;">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endwith %}
+
+  <div class="container-fluid">
+    <div class="main-container">
+      <!-- Navigation -->
+      <nav class="navbar navbar-custom">
+        <div class="container">
+          <a class="navbar-brand" href="{{ url_for('files') }}">
+            <i class="bi bi-cloud-arrow-up"></i> Localy
+          </a>
+          <div class="d-flex">
+            {% if session.authenticated %}
+            <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">
+              <i class="bi bi-box-arrow-right"></i> Logout
+            </a>
+            {% endif %}
+          </div>
+        </div>
+      </nav>
+
+      <!-- Main Content -->
+      <div class="container py-5 px-4">
+        {% block content %}{% endblock %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS (Local) -->
+  <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+
+  <script>
+    // Auto-hide alerts after 5 seconds
+    setTimeout(function () {
+      var alerts = document.querySelectorAll('.alert');
+      alerts.forEach(function (alert) {
+        var bsAlert = new bootstrap.Alert(alert);
+        bsAlert.close();
+      });
+    }, 5000);
+
+    // Scroll position preservation
+    document.addEventListener('DOMContentLoaded', function () {
+      // Restore scroll position on page load
+      const savedPosition = sessionStorage.getItem('scrollPosition');
+      if (savedPosition) {
+        setTimeout(() => {
+          window.scrollTo(0, parseInt(savedPosition));
+          sessionStorage.removeItem('scrollPosition');
+        }, 100);
+      }
+
+      // Save scroll position before navigation
+      const categoryLinks = document.querySelectorAll('a[href*="/files"]');
+      categoryLinks.forEach(link => {
+        link.addEventListener('click', function () {
+          sessionStorage.setItem('scrollPosition', window.scrollY);
+        });
+      });
+
+      // Also save scroll position on browser back/forward
+      window.addEventListener('beforeunload', function () {
+        sessionStorage.setItem('scrollPosition', window.scrollY);
+      });
+    });
+
+    // Session timeout warning and auto-logout
+    let sessionWarningShown = false;
+    let lastActivity = Date.now();
+
+    // Track user activity
+    function updateActivity() {
+      lastActivity = Date.now();
+      sessionWarningShown = false;
+    }
+
+    // Add activity listeners
+    ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'].forEach(event => {
+      document.addEventListener(event, updateActivity, true);
+    });
+
+    // Check session timeout every 30 seconds
+    setInterval(function () {
+      const now = Date.now();
+      const timeSinceActivity = now - lastActivity;
+      const fifteenMinutes = 15 * 60 * 1000; // 15 minutes in milliseconds
+      const thirteenMinutes = 13 * 60 * 1000; // 13 minutes for warning
+
+      // Show warning at 13 minutes
+      if (timeSinceActivity >= thirteenMinutes && !sessionWarningShown) {
+        sessionWarningShown = true;
+        if (confirm('Your session will expire in 2 minutes due to inactivity. Click OK to stay logged in.')) {
+          // User clicked OK, refresh the page to extend session
+          window.location.reload();
+        }
+      }
+
+      // Auto logout at 15 minutes
+      if (timeSinceActivity >= fifteenMinutes) {
+        alert('Session expired due to inactivity. You will be redirected to login.');
+        window.location.href = '/logout';
+      }
+    }, 30000); // Check every 30 seconds
+  </script>
+
+  {% block extra_js %}{% endblock %}
+</body>
+
+</html>
