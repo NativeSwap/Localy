@@ -78,7 +78,7 @@ A beautiful, modern web application for sharing files across your local network.
 2. **Run the Application**
 
    ```bash
-   python run.p
+   python run.py
    ```
 
    or
